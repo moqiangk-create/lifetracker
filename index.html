@@ -42,6 +42,7 @@
         <header class="app-header">
             <h1>LifeTracker</h1>
             <div class="header-actions">
+                <button class="btn-ai" onclick="openModal('aiModal')" title="AI 助手">🤖</button>
                 <button class="btn-settings" onclick="openModal('settingsModal')" title="设置">⚙️</button>
                 <button class="btn-install" id="installBtn" onclick="installApp()" style="display:none">📲 安装</button>
             </div>
@@ -442,12 +443,37 @@
                 </div>
                 <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">
                 <div class="form-group">
+                    <label>🤖 Gemini API Key</label>
+                    <input type="password" id="geminiKeyInput" placeholder="粘贴你的 Gemini API Key" onchange="saveGeminiKey()">
+                    <small>在 <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a> 免费获取，Key 只存在本地</small>
+                </div>
+                <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">
+                <div class="form-group">
                     <label>数据管理</label>
                     <button type="button" class="btn-primary" onclick="exportData()" style="width:100%;margin-bottom:8px;">📥 导出全部数据</button>
                     <input type="file" id="importFile" accept=".json" onchange="importData(event)" style="display:none">
                     <button type="button" class="btn-secondary" onclick="document.getElementById('importFile').click()" style="width:100%;margin-bottom:8px;">📤 导入数据</button>
                     <button type="button" class="btn-secondary" onclick="clearAllData()" style="width:100%;background:#fee2e2;color:#991b1b;border-color:#fecaca;">🗑️ 清空所有数据</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI 助手模态框 -->
+    <div class="modal" id="aiModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🤖 AI 生活助手</h3>
+                <button class="btn-close" onclick="closeModal('aiModal')">&times;</button>
+            </div>
+            <div class="ai-chat" id="aiChat">
+                <div class="ai-welcome">
+                    <div class="ai-bubble ai-bot">你好！我是你的 AI 生活助手。<br>可以问我：<br>• "我这周花了多少钱？"<br>• "分析下我的睡眠质量"<br>• "给我一些习惯打卡建议"</div>
+                </div>
+            </div>
+            <div class="ai-input-area">
+                <input type="text" id="aiInput" placeholder="输入问题，按回车发送..." onkeydown="if(event.key==='Enter') sendAIQuestion()">
+                <button class="btn-primary" onclick="sendAIQuestion()">发送</button>
             </div>
         </div>
     </div>

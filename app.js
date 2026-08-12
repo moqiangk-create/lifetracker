@@ -528,6 +528,9 @@ async function renderDiary() {
                         ${photos.map(src => `<img src="${src}" onclick="event.stopPropagation(); viewPhoto('${src}')">`).join('')}
                     </div>
                 ` : ''}
+                <div class="diary-ai-feedback" id="aiFeedback_${d.id}">
+                    <button onclick="event.stopPropagation(); loadDiaryFeedback(${d.id})">🤖 获取 AI 反馈</button>
+                </div>
                 ${tags.length ? `
                     <div class="diary-tags">
                         ${tags.map(t => `<span class="diary-tag">${escapeHtml(t)}</span>`).join('')}
@@ -908,6 +911,113 @@ async function clearAllData() {
     location.reload();
 }
 
+// ==================== AI 助手（Gemini）====================
+const GEMINI_MODEL = 'gemini-1.5-flash';
+
+function saveGeminiKey() {
+    const key = document.getElementById('geminiKeyInput').value.trim();
+    if (key) {
+        localStorage.setItem('gemini_key', key);
+    } else {
+        localStorage.removeItem('gemini_key');
+    }
+}
+
+function getGeminiKey() {
+    return localStorage.getItem('gemini_key') || '';
+}
+
+async function callGemini(prompt) {
+    const key = getGeminiKey();
+    if (!key) return '请先设置 Gemini API Key（点击右上角 ⚙️）';
+
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.7, maxOutputTokens: 256 }
+            })
+        });
+        const data = await res.json();
+        if (data.error) return `AI 出错：${data.error.message}`;
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || 'AI 没有回答';
+    } catch (e) {
+        return 'AI 请求失败，请检查网络或 API Key';
+    }
+}
+
+async function getDiaryFeedback(content) {
+    const prompt = `你是一个温暖、理解力强的心理陪伴助手。用户写了一篇日记，请用中文给一句简短（30-50字）、温暖、走心的反馈，像朋友一样说话。不要分析，不要建议，只是理解和陪伴。
+
+日记内容：${content}`;
+    return await callGemini(prompt);
+}
+
+async function loadDiaryFeedback(id) {
+    const container = document.getElementById(`aiFeedback_${id}`);
+    if (!container) return;
+    container.innerHTML = '<span class="ai-loading">🤖 思考中...</span>';
+    const d = await getById(TABLES.DIARIES, id);
+    if (!d) {
+        container.innerHTML = '';
+        return;
+    }
+    const feedback = await getDiaryFeedback(d.content);
+    container.innerHTML = `<span class="ai-text">🤖 ${escapeHtml(feedback)}</span>`;
+}
+
+async function sendAIQuestion() {
+    const input = document.getElementById('aiInput');
+    const chat = document.getElementById('aiChat');
+    const question = input.value.trim();
+    if (!question) return;
+
+    // 显示用户消息
+    const userBubble = document.createElement('div');
+    userBubble.className = 'ai-bubble ai-user';
+    userBubble.textContent = question;
+    chat.appendChild(userBubble);
+    input.value = '';
+    chat.scrollTop = chat.scrollHeight;
+
+    // 准备上下文数据（最近7天）
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 7);
+    const [transactions, diaries, habits, habitLogs, sleepRecords] = await Promise.all([
+        getAll(TABLES.TRANSACTIONS),
+        getAll(TABLES.DIARIES),
+        getAll(TABLES.HABITS),
+        getAll(TABLES.HABIT_LOGS),
+        getAll(TABLES.SLEEP)
+    ]);
+    const recentData = {
+        transactions: transactions.filter(t => new Date(t.date) >= cutoff),
+        diaries: diaries.filter(d => new Date(d.date) >= cutoff),
+        habits: habits,
+        habitLogs: habitLogs.filter(h => new Date(h.date) >= cutoff),
+        sleep: sleepRecords.filter(s => new Date(s.date) >= cutoff)
+    };
+
+    // 显示加载中
+    const loadingBubble = document.createElement('div');
+    loadingBubble.className = 'ai-bubble ai-bot';
+    loadingBubble.innerHTML = '<span class="ai-loading">🤖 思考中...</span>';
+    chat.appendChild(loadingBubble);
+    chat.scrollTop = chat.scrollHeight;
+
+    const prompt = `你是一个生活数据助手，名字叫"小管家"。基于用户的真实数据回答问题，语气亲切像朋友。如果数据不足就诚实说。
+
+用户最近7天数据（JSON格式）：${JSON.stringify(recentData, null, 2)}
+
+用户问题：${question}`;
+
+    const answer = await callGemini(prompt);
+    loadingBubble.innerHTML = escapeHtml(answer).replace(/\n/g, '<br>');
+    chat.scrollTop = chat.scrollHeight;
+}
+
 // ==================== 云端同步 ====================
 const SUPABASE_URL = 'https://irovkiusdexjstsnzljv.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlyb3ZraXVzZGV4anN0c256bGp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1MDg3MTYsImV4cCI6MjEwMjA4NDcxNn0.xUV5tdrSv_1s24mYcGnXxPyzkJ74gX7iWfXpmjnqlxg';
@@ -1150,9 +1260,17 @@ async function init() {
     updateTodayDate();
     loadBackground();
 
+    // 加载已保存的 Gemini Key
+    const savedKey = getGeminiKey();
+    if (savedKey) {
+        const input = document.getElementById('geminiKeyInput');
+        if (input) input.value = savedKey;
+    }
+
     // 设置默认日期为今天
     document.getElementById('financeDate').value = todayStr();
     document.getElementById('diaryDate').value = todayStr();
+    document.getElementById('sleepDate').value = todayStr();
 
     // 默认显示课表
     switchModule('schedule');
