@@ -526,6 +526,9 @@ async function initSync() {
     // 启动时拉取云端最新数据
     await pullFromCloud();
 
+    // 把本地历史数据全量推送到云端（旧数据备份）
+    await pushLocalToCloud();
+
     // 订阅实时变更
     supabaseClient
         .channel('sync_changes')
@@ -567,6 +570,22 @@ async function pushToCloud(tableName, recordId, payload, deleted = false) {
         }
     } catch (e) {
         console.error('Push exception:', e);
+    }
+}
+
+async function pushLocalToCloud() {
+    if (!supabaseClient) return;
+    const tables = [TABLES.COURSES, TABLES.TRANSACTIONS, TABLES.DIARIES];
+    for (const table of tables) {
+        try {
+            const items = await getAll(table);
+            for (const item of items) {
+                if (!item || !item.id) continue;
+                await pushToCloud(table, item.id, item, false);
+            }
+        } catch (e) {
+            console.error('Push local error:', e);
+        }
     }
 }
 
