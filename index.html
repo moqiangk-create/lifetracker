@@ -42,6 +42,7 @@
         <header class="app-header">
             <h1>LifeTracker</h1>
             <div class="header-actions">
+                <button class="btn-shake" onclick="openModal('shakeModal')" title="摇一摇">🎲</button>
                 <button class="btn-fortune" onclick="openFortune()" title="每日运势">🎴</button>
                 <button class="btn-ai" onclick="openModal('aiModal')" title="AI 助手">🤖</button>
                 <button class="btn-settings" onclick="openModal('settingsModal')" title="设置">⚙️</button>
@@ -54,6 +55,7 @@
         <main class="main-content">
             <!-- 课表模块 -->
             <section id="scheduleModule" class="module active">
+                <div class="countdown-bar" id="countdownBar" style="display:none"></div>
                 <div class="module-header">
                     <h2>本周课表</h2>
                     <button class="btn-primary" onclick="openModal('courseModal')">+ 添加课程</button>
@@ -465,6 +467,11 @@
                 </div>
                 <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">
                 <div class="form-group">
+                    <label>📅 纪念日/倒计时</label>
+                    <button type="button" class="btn-secondary" onclick="openEventModal()" style="width:100%;margin-bottom:8px;">管理纪念日</button>
+                </div>
+                <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">
+                <div class="form-group">
                     <label>数据管理</label>
                     <button type="button" class="btn-primary" onclick="exportData()" style="width:100%;margin-bottom:8px;">📥 导出全部数据</button>
                     <input type="file" id="importFile" accept=".json" onchange="importData(event)" style="display:none">
@@ -490,6 +497,28 @@
             <div class="ai-input-area">
                 <input type="text" id="aiInput" placeholder="输入问题，按回车发送..." onkeydown="if(event.key==='Enter') sendAIQuestion()">
                 <button class="btn-primary" onclick="sendAIQuestion()">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 摇一摇模态框 -->
+    <div class="modal" id="shakeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🎲 摇一摇</h3>
+                <button class="btn-close" onclick="closeModal('shakeModal')">&times;</button>
+            </div>
+            <div class="shake-body">
+                <div class="shake-tabs">
+                    <button class="shake-tab active" onclick="setShakeMode('quote')">骚话</button>
+                    <button class="shake-tab" onclick="setShakeMode('action')">小事</button>
+                    <button class="shake-tab" onclick="setShakeMode('tip')">知识</button>
+                </div>
+                <div class="shake-card" id="shakeCard">
+                    <div class="shake-hint">👇 点按钮或摇手机</div>
+                </div>
+                <button class="btn-shake-main" onclick="doShake()">🎲 摇一下</button>
+                <div class="shake-tip" id="shakeTip"></div>
             </div>
         </div>
     </div>
@@ -555,6 +584,28 @@
                     <button type="button" class="btn-secondary" onclick="askAIForDecision()">🤖 AI 帮选</button>
                 </div>
                 <div class="wheel-ai-result" id="wheelAIResult"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 纪念日管理模态框 -->
+    <div class="modal" id="eventModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📅 纪念日/倒计时</h3>
+                <button class="btn-close" onclick="closeModal('eventModal')">&times;</button>
+            </div>
+            <div class="event-body">
+                <div class="event-list" id="eventList"></div>
+                <div class="event-form">
+                    <input type="text" id="eventName" placeholder="名称（如：期末考试）">
+                    <input type="date" id="eventDate">
+                    <select id="eventType">
+                        <option value="countdown">⏳ 倒计时（还没发生）</option>
+                        <option value="anniversary">📆 纪念日（已经发生）</option>
+                    </select>
+                    <button class="btn-primary" onclick="saveEvent()">添加</button>
+                </div>
             </div>
         </div>
     </div>

@@ -1408,6 +1408,145 @@ form {
     box-shadow: 0 0 0 3px var(--primary), 0 4px 12px rgba(0,0,0,0.2);
 }
 
+.btn-shake {
+    background: linear-gradient(135deg, #10b981, #3b82f6);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s;
+}
+
+.btn-shake:hover { transform: scale(1.1) rotate(15deg); }
+
+/* 摇一摇 */
+.shake-body { padding: 20px; text-align: center; }
+
+.shake-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    justify-content: center;
+}
+
+.shake-tab {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.shake-tab.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.shake-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 30px 20px;
+    margin-bottom: 16px;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 1.6;
+    border: 1px solid var(--border);
+    animation: popIn 0.4s ease;
+}
+
+.shake-card.shaking { animation: shake 0.5s ease; }
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-10px) rotate(-2deg); }
+    40% { transform: translateX(10px) rotate(2deg); }
+    60% { transform: translateX(-6px) rotate(-1deg); }
+    80% { transform: translateX(6px) rotate(1deg); }
+}
+
+.shake-hint { color: var(--text-secondary); font-size: 14px; }
+
+.btn-shake-main {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: white;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 30px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-shake-main:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(79, 70, 229, 0.3);
+}
+
+.shake-tip { font-size: 12px; color: var(--text-secondary); margin-top: 10px; }
+
+/* 纪念日 */
+.countdown-bar {
+    background: var(--surface);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    animation: slideUpFade 0.4s ease;
+}
+
+.countdown-bar .event-name { font-weight: 600; font-size: 14px; }
+
+.countdown-bar .event-days { font-size: 20px; font-weight: 700; color: var(--primary); }
+
+.event-body { padding: 16px 20px 24px; }
+
+.event-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.event-item {
+    background: var(--surface);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid var(--border);
+    animation: slideUpFade 0.3s ease;
+}
+
+.event-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
 /* 响应式：桌面端 */
 @media (min-width: 768px) {
     .main-content {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lifetracker-v15';
+const CACHE_NAME = 'lifetracker-v17';
 const FILES_TO_CACHE = [
     './',
     './index.html',

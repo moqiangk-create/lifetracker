@@ -5,7 +5,7 @@
 
 // ==================== 数据库封装 ====================
 const DB_NAME = 'LifeTrackerDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 const TABLES = {
     COURSES: 'courses',
@@ -13,7 +13,8 @@ const TABLES = {
     DIARIES: 'diaries',
     HABITS: 'habits',
     HABIT_LOGS: 'habitLogs',
-    SLEEP: 'sleep'
+    SLEEP: 'sleep',
+    EVENTS: 'events'
 };
 
 let db = null;
@@ -48,6 +49,10 @@ function openDB() {
             if (!database.objectStoreNames.contains(TABLES.SLEEP)) {
                 const sl = database.createObjectStore(TABLES.SLEEP, { keyPath: 'id', autoIncrement: true });
                 sl.createIndex('date', 'date', { unique: false });
+            }
+            // v3 新增表
+            if (!database.objectStoreNames.contains(TABLES.EVENTS)) {
+                database.createObjectStore(TABLES.EVENTS, { keyPath: 'id', autoIncrement: true });
             }
         };
     });
@@ -215,7 +220,7 @@ function switchModule(name) {
     document.querySelector(`.nav-item[data-module="${name}"]`).classList.add('active');
 
     // 刷新数据
-    if (name === 'schedule') renderSchedule();
+    if (name === 'schedule') { renderSchedule(); renderCountdown(); }
     if (name === 'finance') renderFinance();
     if (name === 'diary') renderDiary();
     if (name === 'habit') renderHabits();
@@ -929,7 +934,7 @@ function getGeminiKey() {
     return localStorage.getItem('gemini_key') || '';
 }
 
-async function callAI(messages) {
+async function callAI(messages, maxTokens = 256) {
     const key = getGeminiKey();
     if (!key) return '请先设置 API Key（点击右上角 ⚙️）';
 
@@ -943,8 +948,8 @@ async function callAI(messages) {
             body: JSON.stringify({
                 model: AI_MODEL,
                 messages: messages,
-                temperature: 0.7,
-                max_tokens: 256
+                temperature: 0.8,
+                max_tokens: maxTokens
             })
         });
         const data = await res.json();
@@ -1569,6 +1574,245 @@ function animateMoney(element, endValue, duration = 600) {
     requestAnimationFrame(step);
 }
 
+// ==================== 摇一摇（纯本地，零token）====================
+const SHAKE_QUOTES = [
+    "早起的虫子被鸟吃，幸好我是大学生，不是虫子。",
+    "别慌，月亮也正在大海某处迷茫。",
+    "虽然今天什么都没做，但还是辛苦我了。",
+    "摆烂不摆烂，摆烂不彻底等于彻底不摆烂。",
+    "我的钱包比我更渴望放假。",
+    "别人：为梦想奋斗；我：为睡觉奋斗。",
+    "生活不止眼前的苟且，还有前任的请帖。",
+    "如果生活给了你一个柠檬，不要榨汁，直接砸回去。",
+    "间歇性踌躇满志，持续性混吃等死。",
+    "我不是懒，我是在节能模式。",
+    "减肥出尔反尔，干饭言出必行。",
+    "只要坚持，每个困难都能克服我。",
+    "人生就像打电话，不是你先挂就是我先挂。",
+    "同龄人：结婚生子；我：这个表情包好好笑。",
+    "别人在外面搂搂抱抱，我在学校好的收到。",
+    "今天的风儿有点喧嚣，把我的早八都吹走了。",
+    "脑袋空不要紧，关键是不要进水。",
+    "我不回消息很正常，厂里掏手机罚 200。",
+    "谈恋爱图什么？图他年纪大？图他不洗澡？",
+    "吾日三省吾身：早上吃什么？中午吃什么？晚上吃什么？"
+];
+
+const SHAKE_ACTIONS = [
+    "喝一大杯水（现在就喝）",
+    "做 10 个深蹲",
+    "站起来拉伸 30 秒",
+    "给手机相册删 10 张废图",
+    "整理一下桌面或书包",
+    "给爸妈发一条微信",
+    "闭眼深呼吸 1 分钟",
+    "把明天的课表截图设壁纸",
+    "把垃圾桶里的垃圾袋系好提出去",
+    "擦一下手机屏幕",
+    "把被子叠一下",
+    "打开窗通风 2 分钟",
+    "写下今天做的最棒的一件事",
+    "听一首高中时喜欢的歌",
+    "把待洗的衣服扔进洗衣机",
+    "给室友/朋友一个真诚的赞美",
+    "把明天要穿的衣服准备好",
+    "检查一下信用卡/花呗账单",
+    "做一次眼保健操第一节",
+    "把冰箱里快过期的食物吃掉",
+    "给手机充上电（如果低于 50%）",
+    "清理一下微信收藏夹",
+    "把闹钟往前调 5 分钟",
+    "把今天的步数目标设好"
+];
+
+const SHAKE_TIPS = [
+    { category: "生活", content: "煮泡面时先放调料包再煮面，面条更入味；煮好后加几滴醋，解腻提鲜。" },
+    { category: "学习", content: "费曼学习法：试着用最简单的语言给别人讲清楚一个概念，讲不清就是没真懂。" },
+    { category: "学习", content: "番茄工作法的正确用法：25 分钟专注 + 5 分钟真正休息（别刷手机）。" },
+    { category: "健康", content: "20-20-20 护眼法则：每看屏幕 20 分钟，看 20 英尺（6米）外 20 秒。" },
+    { category: "省钱", content: "购物车冷静期：把想买的东西放 3 天再看，冲动消费能减少 70%。" },
+    { category: "社交", content: "记住陌生人名字的技巧：介绍时在心里默念三遍，对话中刻意使用一次。" },
+    { category: "生活", content: "白衬衫领口发黄，用牙膏干刷后再洗，效果比漂白剂好。" },
+    { category: "健康", content: "午睡 20-30 分钟最佳，超过 1 小时会进入深睡眠，醒来反而更困。" },
+    { category: "学习", content: "睡前 1 小时复习，记忆巩固效果比平时好 40%（睡眠记忆巩固效应）。" },
+    { category: "省钱", content: "买教材前先查图书馆有没有，或问学长学姐买二手，能省 50-80%。" },
+    { category: "生活", content: "地铁/公交上手机快没电，开启飞行模式再充电，速度快一倍。" },
+    { category: "健康", content: "饭后百步走是错的，饭后立即运动会胃下垂，应休息 20-30 分钟。" },
+    { category: "社交", content: "拒绝别人的时候，态度要好，理由要短，不要过多解释，越解释越被动。" },
+    { category: "学习", content: "写论文卡壳时，先写最差的第一稿，完成比完美重要 100 倍。" },
+    { category: "生活", content: "耳机线/充电线缠在一起，用长尾夹固定桌边，永远不乱。" },
+    { category: "健康", content: "熬夜后不要过度补觉，第二天按正常时间起床，晚上早点睡，生物钟恢复快。" },
+    { category: "省钱", content: "大学生很多软件有教育优惠：JetBrains、Office 365、Apple Music、Notion 都免费或半价。" },
+    { category: "社交", content: "群聊里@所有人之前，先想想真的需要打扰所有人吗？" },
+    { category: "生活", content: "衣服沾上油渍，立刻用洗洁精干搓，大部分油渍都能掉。" },
+    { category: "健康", content: "久坐 1 小时 = 抽烟 2 根，设个闹钟每小时站起来 2 分钟。" },
+    { category: "学习", content: "考试前夜不要通宵复习，睡眠剥夺会导致记忆提取失败，得不偿失。" },
+    { category: "省钱", content: "超市晚上 8 点后生鲜打折，便利店关东煮晚上 10 后半价。" },
+    { category: "生活", content: "忘带钥匙/校园卡，在室友群里发消息前，先摸摸所有口袋和书包夹层。" },
+    { category: "健康", content: "嘴里长溃疡，吃维生素 B2 + 用盐水漱口，3 天基本能好。" },
+    { category: "社交", content: "别人自嘲的时候，不要跟着附和，那是人家的特权，不是你的。" }
+];
+
+let shakeMode = 'quote';
+
+function setShakeMode(mode) {
+    shakeMode = mode;
+    document.querySelectorAll('.shake-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.shake-tab[onclick="setShakeMode('${mode}')"]`).classList.add('active');
+    document.getElementById('shakeCard').innerHTML = '<div class="shake-hint">👇 点按钮或摇手机</div>';
+    document.getElementById('shakeTip').textContent = '';
+}
+
+async function doShake() {
+    const card = document.getElementById('shakeCard');
+    card.classList.add('shaking');
+    setTimeout(() => card.classList.remove('shaking'), 500);
+    card.innerHTML = '<div class="shake-hint">🤖 AI 正在生成...</div>';
+
+    let prompt = '';
+    let maxTokens = 60;
+    if (shakeMode === 'quote') {
+        prompt = '你是一位幽默的大学生段子手。请用一句话生成一句中文幽默骚话/毒鸡汤（30字以内），适合发朋友圈。只输出内容，不要解释。';
+        maxTokens = 60;
+    } else if (shakeMode === 'action') {
+        prompt = '你是一位生活小助手。请生成一件今天可以做的、简单又有意义的微行动（15字以内），比如"给爸妈发条微信"。只输出内容，不要解释。';
+        maxTokens = 50;
+    } else if (shakeMode === 'tip') {
+        prompt = '你是一位知识博主。请分享一条对大学生有实际用处的冷知识或生活技巧（35字以内），开头标注领域如[省钱]。只输出内容，不要解释。';
+        maxTokens = 80;
+    }
+
+    try {
+        const result = await callAI([{ role: 'user', content: prompt }], maxTokens);
+        if (result.startsWith('AI ') || result.startsWith('请先')) throw new Error(result);
+
+        if (shakeMode === 'action') {
+            card.innerHTML = `<div>✨ ${escapeHtml(result)}</div>`;
+        } else {
+            card.innerHTML = `<div>${escapeHtml(result)}</div>`;
+        }
+    } catch (e) {
+        // AI 失败时回退本地预置
+        let fallback = '';
+        if (shakeMode === 'quote') {
+            fallback = SHAKE_QUOTES[Math.floor(Math.random() * SHAKE_QUOTES.length)];
+            card.innerHTML = `<div>${escapeHtml(fallback)}</div>`;
+        } else if (shakeMode === 'action') {
+            fallback = SHAKE_ACTIONS[Math.floor(Math.random() * SHAKE_ACTIONS.length)];
+            card.innerHTML = `<div>✨ ${escapeHtml(fallback)}</div>`;
+        } else if (shakeMode === 'tip') {
+            const tip = SHAKE_TIPS[Math.floor(Math.random() * SHAKE_TIPS.length)];
+            card.innerHTML = `<div><span style="color:var(--primary);font-weight:600;">[${tip.category}]</span><br>${escapeHtml(tip.content)}</div>`;
+        }
+        document.getElementById('shakeTip').textContent = '（AI 离线，已切换本地版）';
+    }
+}
+
+let lastX = 0, lastY = 0, lastZ = 0;
+let shakeThreshold = 15;
+let lastShakeTime = 0;
+
+function initShakeMotion() {
+    if (window.DeviceMotionEvent) {
+        window.addEventListener('devicemotion', (e) => {
+            const acc = e.accelerationIncludingGravity;
+            if (!acc) return;
+            const deltaX = Math.abs(acc.x - lastX);
+            const deltaY = Math.abs(acc.y - lastY);
+            const deltaZ = Math.abs(acc.z - lastZ);
+            const total = deltaX + deltaY + deltaZ;
+            if (total > shakeThreshold) {
+                const now = Date.now();
+                if (now - lastShakeTime > 1000) {
+                    lastShakeTime = now;
+                    const modal = document.getElementById('shakeModal');
+                    if (modal && modal.classList.contains('active')) {
+                        doShake();
+                    }
+                }
+            }
+            lastX = acc.x;
+            lastY = acc.y;
+            lastZ = acc.z;
+        });
+    }
+}
+
+// ==================== 纪念日/倒计时 ====================
+async function renderCountdown() {
+    const events = await getAll(TABLES.EVENTS);
+    const bar = document.getElementById('countdownBar');
+    if (events.length === 0 || !bar) {
+        if (bar) bar.style.display = 'none';
+        return;
+    }
+    bar.style.display = 'flex';
+    const today = new Date(todayStr());
+    const list = events.map(e => {
+        const eventDate = new Date(e.date);
+        const diffTime = eventDate - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return { ...e, diffDays };
+    }).sort((a, b) => Math.abs(a.diffDays) - Math.abs(b.diffDays));
+
+    const nearest = list[0];
+    if (nearest.diffDays > 0) {
+        bar.innerHTML = `<span class="event-name">⏳ ${escapeHtml(nearest.name)}</span><span class="event-days">还有 ${nearest.diffDays} 天</span>`;
+    } else if (nearest.diffDays < 0) {
+        bar.innerHTML = `<span class="event-name">📆 ${escapeHtml(nearest.name)}</span><span class="event-days">已过 ${Math.abs(nearest.diffDays)} 天</span>`;
+    } else {
+        bar.innerHTML = `<span class="event-name">🎉 ${escapeHtml(nearest.name)}</span><span class="event-days">就是今天！</span>`;
+    }
+}
+
+async function saveEvent() {
+    const name = document.getElementById('eventName').value.trim();
+    const date = document.getElementById('eventDate').value;
+    const type = document.getElementById('eventType').value;
+    if (!name || !date) return;
+    await add(TABLES.EVENTS, { name, date, type });
+    document.getElementById('eventName').value = '';
+    document.getElementById('eventDate').value = '';
+    renderEvents();
+    renderCountdown();
+}
+
+async function renderEvents() {
+    const events = await getAll(TABLES.EVENTS);
+    const container = document.getElementById('eventList');
+    if (events.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary);">📅 还没有纪念日</div>';
+        return;
+    }
+    container.innerHTML = events.map(e => {
+        const today = new Date(todayStr());
+        const eventDate = new Date(e.date);
+        const diffDays = Math.ceil((eventDate - today) / (1000 * 60 * 60 * 24));
+        const daysText = diffDays > 0 ? `还有 ${diffDays} 天` : (diffDays < 0 ? `已过 ${Math.abs(diffDays)} 天` : '就是今天');
+        return `
+            <div class="event-item">
+                <div>
+                    <div style="font-weight:500;">${escapeHtml(e.name)}</div>
+                    <div style="font-size:12px;color:var(--text-secondary);">${e.date} · ${daysText}</div>
+                </div>
+                <button class="btn-icon" onclick="deleteEvent(${e.id})">🗑️</button>
+            </div>
+        `;
+    }).join('');
+}
+
+async function deleteEvent(id) {
+    if (!confirm('确定删除这个纪念日吗？')) return;
+    await remove(TABLES.EVENTS, id);
+    renderEvents();
+    renderCountdown();
+}
+
+function openEventModal() {
+    openModal('eventModal');
+    renderEvents();
+}
+
 // ==================== 初始化 ====================
 async function init() {
     db = await openDB();
@@ -1596,6 +1840,9 @@ async function init() {
         input.addEventListener('input', () => drawWheel());
     });
 
+    // 初始化摇一摇
+    initShakeMotion();
+
     // 注册 Service Worker
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js').catch(() => {});
@@ -1603,6 +1850,9 @@ async function init() {
 
     // 初始化云端同步
     await initSync();
+
+    // 渲染纪念日倒计时
+    renderCountdown();
 }
 
 init();
