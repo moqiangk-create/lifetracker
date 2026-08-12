@@ -70,6 +70,25 @@ html, body {
     border-radius: 20px;
 }
 
+.btn-install {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    animation: fadeIn 0.3s ease;
+}
+
+.btn-install:active {
+    transform: scale(0.95);
+}
+
 /* 主内容区 */
 .main-content {
     flex: 1;

@@ -9,12 +9,38 @@
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script>
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const btn = document.getElementById('installBtn');
+            if (btn) btn.style.display = 'inline-flex';
+        });
+        async function installApp() {
+            const btn = document.getElementById('installBtn');
+            if (!deferredPrompt) {
+                alert('请通过 Chrome 菜单 (⋮) → "添加到主屏幕" 手动安装');
+                return;
+            }
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            deferredPrompt = null;
+            if (btn) btn.style.display = 'none';
+        }
+        window.addEventListener('appinstalled', () => {
+            deferredPrompt = null;
+            const btn = document.getElementById('installBtn');
+            if (btn) btn.style.display = 'none';
+        });
+    </script>
 </head>
 <body>
     <div id="app">
         <!-- 顶部标题 -->
         <header class="app-header">
             <h1>LifeTracker</h1>
+            <button class="btn-install" id="installBtn" onclick="installApp()" style="display:none">📲 安装</button>
             <span class="date-today" id="dateToday"></span>
         </header>
 
