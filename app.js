@@ -42,7 +42,7 @@ function getStore(table, mode = 'readonly') {
     return tx.objectStore(table);
 }
 
-function add(table, data) {
+function dbAdd(table, data) {
     return new Promise((resolve, reject) => {
         const store = getStore(table, 'readwrite');
         const req = store.add(data);
@@ -51,7 +51,7 @@ function add(table, data) {
     });
 }
 
-function put(table, data) {
+function dbPut(table, data) {
     return new Promise((resolve, reject) => {
         const store = getStore(table, 'readwrite');
         const req = store.put(data);
@@ -60,7 +60,7 @@ function put(table, data) {
     });
 }
 
-function remove(table, id) {
+function dbRemove(table, id) {
     return new Promise((resolve, reject) => {
         const store = getStore(table, 'readwrite');
         const req = store.delete(id);
@@ -87,25 +87,20 @@ function getById(table, id) {
     });
 }
 
-// 保存原始数据库操作，用于云端同步包装
-const _dbAdd = add;
-const _dbPut = put;
-const _dbRemove = remove;
-
 async function add(table, data, skipSync = false) {
-    const id = await _dbAdd(table, data);
+    const id = await dbAdd(table, data);
     if (!skipSync) await pushToCloud(table, id, { ...data, id }, false);
     return id;
 }
 
 async function put(table, data, skipSync = false) {
-    const id = await _dbPut(table, data);
+    const id = await dbPut(table, data);
     if (!skipSync) await pushToCloud(table, data.id, data, false);
     return id;
 }
 
 async function remove(table, id, skipSync = false) {
-    await _dbRemove(table, id);
+    await dbRemove(table, id);
     if (!skipSync) await pushToCloud(table, id, {}, true);
     return id;
 }
