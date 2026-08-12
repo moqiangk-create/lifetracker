@@ -42,6 +42,7 @@
         <header class="app-header">
             <h1>LifeTracker</h1>
             <div class="header-actions">
+                <button class="btn-fortune" onclick="openFortune()" title="每日运势">🎴</button>
                 <button class="btn-ai" onclick="openModal('aiModal')" title="AI 助手">🤖</button>
                 <button class="btn-settings" onclick="openModal('settingsModal')" title="设置">⚙️</button>
                 <button class="btn-install" id="installBtn" onclick="installApp()" style="display:none">📲 安装</button>
@@ -449,6 +450,21 @@
                 </div>
                 <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">
                 <div class="form-group">
+                    <label>🎨 主题配色</label>
+                    <div class="theme-selector">
+                        <button class="theme-btn active" data-theme="default" onclick="setTheme('default')" style="background:linear-gradient(135deg,#4f46e5,#ec4899)">紫霞</button>
+                        <button class="theme-btn" data-theme="mint" onclick="setTheme('mint')" style="background:linear-gradient(135deg,#10b981,#06b6d4)">薄荷</button>
+                        <button class="theme-btn" data-theme="sakura" onclick="setTheme('sakura')" style="background:linear-gradient(135deg,#f472b6,#fb7185)">樱花</button>
+                        <button class="theme-btn" data-theme="dark" onclick="setTheme('dark')" style="background:linear-gradient(135deg,#1e1b4b,#4c1d95)">暗夜</button>
+                        <button class="theme-btn" data-theme="sunset" onclick="setTheme('sunset')" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">暖阳</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>趣味工具</label>
+                    <button type="button" class="btn-secondary" onclick="openModal('wheelModal')" style="width:100%;margin-bottom:8px;">🎯 决策转盘</button>
+                </div>
+                <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">
+                <div class="form-group">
                     <label>数据管理</label>
                     <button type="button" class="btn-primary" onclick="exportData()" style="width:100%;margin-bottom:8px;">📥 导出全部数据</button>
                     <input type="file" id="importFile" accept=".json" onchange="importData(event)" style="display:none">
@@ -474,6 +490,71 @@
             <div class="ai-input-area">
                 <input type="text" id="aiInput" placeholder="输入问题，按回车发送..." onkeydown="if(event.key==='Enter') sendAIQuestion()">
                 <button class="btn-primary" onclick="sendAIQuestion()">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 运势签模态框 -->
+    <div class="modal" id="fortuneModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🎴 每日运势</h3>
+                <button class="btn-close" onclick="closeModal('fortuneModal')">&times;</button>
+            </div>
+            <div class="fortune-body" id="fortuneBody">
+                <div class="fortune-card">
+                    <div class="fortune-title">今日运势</div>
+                    <div class="fortune-content" id="fortuneSummary">点击下方按钮生成今日运势...</div>
+                    <div class="fortune-grid">
+                        <div class="fortune-item">
+                            <span class="fortune-label">🍀 幸运色</span>
+                            <span class="fortune-value" id="fortuneColor">-</span>
+                        </div>
+                        <div class="fortune-item">
+                            <span class="fortune-label">🔢 幸运数字</span>
+                            <span class="fortune-value" id="fortuneNumber">-</span>
+                        </div>
+                    </div>
+                    <div class="fortune-list">
+                        <div class="fortune-suitable">
+                            <strong>✅ 宜</strong>
+                            <ul id="fortuneSuitable"></ul>
+                        </div>
+                        <div class="fortune-avoid">
+                            <strong>❌ 忌</strong>
+                            <ul id="fortuneAvoid"></ul>
+                        </div>
+                    </div>
+                    <div class="fortune-quote" id="fortuneQuote"></div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="generateFortuneWithAI()">🤖 AI 重新生成</button>
+                <button type="button" class="btn-primary" onclick="closeModal('fortuneModal')">收下签</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 决策转盘模态框 -->
+    <div class="modal" id="wheelModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🎯 决策转盘</h3>
+                <button class="btn-close" onclick="closeModal('wheelModal')">&times;</button>
+            </div>
+            <div class="wheel-body">
+                <canvas id="wheelCanvas" width="280" height="280"></canvas>
+                <div class="wheel-options" id="wheelOptions">
+                    <input type="text" class="wheel-input" placeholder="选项1" value="吃火锅">
+                    <input type="text" class="wheel-input" placeholder="选项2" value="吃烧烤">
+                    <input type="text" class="wheel-input" placeholder="选项3" value="吃日料">
+                </div>
+                <div class="wheel-buttons">
+                    <button type="button" class="btn-secondary" onclick="addWheelOption()">+ 加选项</button>
+                    <button type="button" class="btn-primary" onclick="spinWheel()">🎯 开始转</button>
+                    <button type="button" class="btn-secondary" onclick="askAIForDecision()">🤖 AI 帮选</button>
+                </div>
+                <div class="wheel-ai-result" id="wheelAIResult"></div>
             </div>
         </div>
     </div>

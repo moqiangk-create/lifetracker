@@ -225,6 +225,7 @@ function switchModule(name) {
 function openModal(id) {
     document.getElementById(id).classList.add('active');
     document.body.style.overflow = 'hidden';
+    if (id === 'wheelModal') setTimeout(drawWheel, 100);
 }
 
 function closeModal(id) {
@@ -1236,6 +1237,314 @@ function resetBackground() {
     if (input) input.value = '';
 }
 
+// ==================== 主题换肤 ====================
+const THEMES = {
+    default: {
+        primary: '#4f46e5',
+        primaryLight: '#6366f1',
+        primaryDark: '#4338ca',
+        gradient: 'linear-gradient(160deg, #4f46e5 0%, #7c3aed 25%, #db2777 60%, #f59e0b 100%)',
+        headerGradient: 'linear-gradient(135deg, rgba(79,70,229,0.95) 0%, rgba(236,72,153,0.9) 100%)'
+    },
+    mint: {
+        primary: '#059669',
+        primaryLight: '#10b981',
+        primaryDark: '#047857',
+        gradient: 'linear-gradient(160deg, #059669 0%, #06b6d4 50%, #3b82f6 100%)',
+        headerGradient: 'linear-gradient(135deg, rgba(5,150,105,0.95) 0%, rgba(6,182,212,0.9) 100%)'
+    },
+    sakura: {
+        primary: '#db2777',
+        primaryLight: '#ec4899',
+        primaryDark: '#be185d',
+        gradient: 'linear-gradient(160deg, #f472b6 0%, #fb7185 50%, #fbbf24 100%)',
+        headerGradient: 'linear-gradient(135deg, rgba(244,114,182,0.95) 0%, rgba(251,113,133,0.9) 100%)'
+    },
+    dark: {
+        primary: '#7c3aed',
+        primaryLight: '#8b5cf6',
+        primaryDark: '#6d28d9',
+        gradient: 'linear-gradient(160deg, #1e1b4b 0%, #4c1d95 50%, #7c3aed 100%)',
+        headerGradient: 'linear-gradient(135deg, rgba(30,27,75,0.95) 0%, rgba(76,29,149,0.9) 100%)'
+    },
+    sunset: {
+        primary: '#d97706',
+        primaryLight: '#f59e0b',
+        primaryDark: '#b45309',
+        gradient: 'linear-gradient(160deg, #f59e0b 0%, #ef4444 50%, #db2777 100%)',
+        headerGradient: 'linear-gradient(135deg, rgba(245,158,11,0.95) 0%, rgba(239,68,68,0.9) 100%)'
+    }
+};
+
+function setTheme(name) {
+    const theme = THEMES[name];
+    if (!theme) return;
+    localStorage.setItem('lt_theme', name);
+    applyTheme(theme);
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.theme === name);
+    });
+}
+
+function applyTheme(theme) {
+    const root = document.documentElement;
+    root.style.setProperty('--primary', theme.primary);
+    root.style.setProperty('--primary-light', theme.primaryLight);
+    root.style.setProperty('--primary-dark', theme.primaryDark);
+
+    const bgLayer = document.getElementById('bgLayer');
+    if (bgLayer && !bgLayer.classList.contains('has-image')) {
+        bgLayer.style.background = theme.gradient;
+    }
+
+    const header = document.querySelector('.app-header');
+    if (header) header.style.background = theme.headerGradient;
+}
+
+function loadTheme() {
+    const saved = localStorage.getItem('lt_theme') || 'default';
+    const theme = THEMES[saved];
+    if (theme) applyTheme(theme);
+    const btn = document.querySelector(`.theme-btn[data-theme="${saved}"]`);
+    if (btn) {
+        document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+}
+
+// ==================== 每日运势签 ====================
+function openFortune() {
+    loadFortune();
+    openModal('fortuneModal');
+}
+
+function loadFortune() {
+    const saved = localStorage.getItem(`lt_fortune_${todayStr()}`);
+    if (saved) {
+        renderFortune(JSON.parse(saved));
+    } else {
+        // 随机生成一个基础版
+        const basic = generateBasicFortune();
+        renderFortune(basic);
+        localStorage.setItem(`lt_fortune_${todayStr()}`, JSON.stringify(basic));
+    }
+}
+
+function generateBasicFortune() {
+    const summaries = [
+        '今天是个充满活力的日子，保持积极心态会有好事发生。',
+        '适合静下心来整理思绪，给自己一点独处的时间。',
+        '能量满满的一天，不妨挑战一件一直想做的事。',
+        '今天适合与人交流，可能会遇到志同道合的朋友。',
+        '放慢脚步，享受生活中的小确幸，今天适合休息。'
+    ];
+    const colors = ['红色', '蓝色', '绿色', '黄色', '紫色', '白色'];
+    const numbers = ['3', '7', '8', '12', '21', '66'];
+    const suitable = ['整理课表', '记账', '给朋友发消息', '早睡', '写日记'];
+    const avoid = ['熬夜', '冲动消费', '拖延作业'];
+    const quotes = [
+        '每一天都是新的开始。',
+        '慢慢来，比较快。',
+        '做最好的自己，而不是第二个别人。'
+    ];
+    return {
+        summary: summaries[Math.floor(Math.random() * summaries.length)],
+        luckyColor: colors[Math.floor(Math.random() * colors.length)],
+        luckyNumber: numbers[Math.floor(Math.random() * numbers.length)],
+        suitable: suitable.sort(() => 0.5 - Math.random()).slice(0, 3),
+        avoid: avoid.sort(() => 0.5 - Math.random()).slice(0, 2),
+        quote: quotes[Math.floor(Math.random() * quotes.length)]
+    };
+}
+
+function renderFortune(data) {
+    document.getElementById('fortuneSummary').textContent = data.summary;
+    document.getElementById('fortuneColor').textContent = data.luckyColor;
+    document.getElementById('fortuneNumber').textContent = data.luckyNumber;
+    document.getElementById('fortuneSuitable').innerHTML = data.suitable.map(s => `<li>${s}</li>`).join('');
+    document.getElementById('fortuneAvoid').innerHTML = data.avoid.map(a => `<li>${a}</li>`).join('');
+    document.getElementById('fortuneQuote').textContent = data.quote ? `💬 "${data.quote}"` : '';
+}
+
+async function generateFortuneWithAI() {
+    const summaryEl = document.getElementById('fortuneSummary');
+    summaryEl.textContent = '🤖 AI 正在为你测算今日运势...';
+
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 3);
+    const [diaries, sleepRecords] = await Promise.all([
+        getAll(TABLES.DIARIES),
+        getAll(TABLES.SLEEP)
+    ]);
+    const recentDiaries = diaries.filter(d => new Date(d.date) >= cutoff).map(d => ({
+        date: d.date,
+        mood: d.mood,
+        content: d.content.substring(0, 50)
+    }));
+    const recentSleep = sleepRecords.filter(s => new Date(s.date) >= cutoff).map(s => ({
+        date: s.date,
+        quality: s.quality
+    }));
+
+    const messages = [
+        { role: 'system', content: '你是一个有趣的运势大师，根据用户最近几天的心情和状态，生成一条幽默、接地气的中文每日运势签。请严格返回 JSON 格式，不要加任何其他文字。' },
+        { role: 'user', content: `用户最近3天日记（日期+心情+内容摘要）：${JSON.stringify(recentDiaries)}\n用户最近3天睡眠质量（1-5分）：${JSON.stringify(recentSleep)}\n\n请生成 JSON：{"summary":"一句话运势概述（30字以内，幽默风格）","luckyColor":"一个颜色","luckyNumber":"一个数字","suitable":["宜做的3件事"],"avoid":["不宜做的2件事"],"quote":"一句今日语录（20字以内）"}` }
+    ];
+
+    try {
+        const response = await callAI(messages);
+        // 尝试从 AI 响应中提取 JSON
+        let jsonStr = response;
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) jsonStr = jsonMatch[0];
+        const data = JSON.parse(jsonStr);
+        renderFortune(data);
+        localStorage.setItem(`lt_fortune_${todayStr()}`, JSON.stringify(data));
+    } catch (e) {
+        console.error('Fortune AI error:', e);
+        const basic = generateBasicFortune();
+        renderFortune(basic);
+        summaryEl.textContent = basic.summary + '（AI 生成失败，已切换随机版）';
+    }
+}
+
+// ==================== 决策转盘 ====================
+const WHEEL_COLORS = ['#4f46e5', '#ec4899', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#ef4444', '#3b82f6'];
+
+function getWheelOptions() {
+    return Array.from(document.querySelectorAll('.wheel-input'))
+        .map(i => i.value.trim())
+        .filter(Boolean);
+}
+
+function drawWheel(rotation = 0) {
+    const canvas = document.getElementById('wheelCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const options = getWheelOptions();
+    if (options.length === 0) return;
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const radius = Math.min(cx, cy) - 8;
+    const sliceAngle = (2 * Math.PI) / options.length;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let i = 0; i < options.length; i++) {
+        const start = rotation + i * sliceAngle;
+        const end = rotation + (i + 1) * sliceAngle;
+
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, radius, start, end);
+        ctx.closePath();
+        ctx.fillStyle = WHEEL_COLORS[i % WHEEL_COLORS.length];
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.stroke();
+
+        const textAngle = start + sliceAngle / 2;
+        const tx = cx + Math.cos(textAngle) * (radius * 0.6);
+        const ty = cy + Math.sin(textAngle) * (radius * 0.6);
+        ctx.save();
+        ctx.translate(tx, ty);
+        ctx.rotate(textAngle + Math.PI / 2);
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 13px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(options[i].substring(0, 4), 0, 0);
+        ctx.restore();
+    }
+
+    // 中心圆
+    ctx.beginPath();
+    ctx.arc(cx, cy, 20, 0, 2 * Math.PI);
+    ctx.fillStyle = 'white';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+    ctx.stroke();
+
+    // 指针
+    ctx.beginPath();
+    ctx.moveTo(cx + radius - 2, cy - 10);
+    ctx.lineTo(cx + radius + 18, cy);
+    ctx.lineTo(cx + radius - 2, cy + 10);
+    ctx.closePath();
+    ctx.fillStyle = '#ef4444';
+    ctx.fill();
+}
+
+function spinWheel() {
+    const options = getWheelOptions();
+    if (options.length < 2) {
+        alert('至少填 2 个选项');
+        return;
+    }
+
+    const canvas = document.getElementById('wheelCanvas');
+    const duration = 4000;
+    const totalRotation = 2 * Math.PI * 8 + Math.random() * 2 * Math.PI;
+    const startTime = performance.now();
+
+    function animate(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const ease = 1 - Math.pow(1 - progress, 4);
+        const current = totalRotation * ease;
+        drawWheel(current);
+
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        } else {
+            const sliceAngle = (2 * Math.PI) / options.length;
+            const normalized = (2 * Math.PI - (current % (2 * Math.PI))) % (2 * Math.PI);
+            const winner = Math.floor(normalized / sliceAngle) % options.length;
+            setTimeout(() => {
+                alert(`🎯 命运选中：${options[winner]}！`);
+            }, 200);
+        }
+    }
+    requestAnimationFrame(animate);
+}
+
+function addWheelOption() {
+    const container = document.getElementById('wheelOptions');
+    const inputs = container.querySelectorAll('.wheel-input');
+    if (inputs.length >= 8) {
+        alert('最多 8 个选项');
+        return;
+    }
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'wheel-input';
+    input.placeholder = `选项${inputs.length + 1}`;
+    container.appendChild(input);
+    drawWheel();
+}
+
+async function askAIForDecision() {
+    const options = getWheelOptions();
+    if (options.length < 2) {
+        alert('至少填 2 个选项');
+        return;
+    }
+    const resultEl = document.getElementById('wheelAIResult');
+    resultEl.innerHTML = '<span class="ai-loading">🤖 AI 正在思考...</span>';
+
+    const messages = [
+        { role: 'system', content: '你是一个幽默的决策顾问，帮用户分析选项的利弊。语气轻松，像朋友聊天。' },
+        { role: 'user', content: `我在纠结这几个选项：${options.join('、')}。请帮我简单分析每个选项的利弊，然后给一个推荐（带理由）。控制在80字以内。` }
+    ];
+
+    try {
+        const answer = await callAI(messages);
+        resultEl.innerHTML = `<div class="ai-bubble ai-bot" style="max-width:100%;margin-top:8px;">${escapeHtml(answer).replace(/\n/g, '<br>')}</div>`;
+    } catch (e) {
+        resultEl.textContent = 'AI 请求失败';
+    }
+}
+
 // ==================== 数字滚动动画 ====================
 function animateMoney(element, endValue, duration = 600) {
     const startText = element.textContent.replace(/[¥,]/g, '');
@@ -1265,8 +1574,9 @@ async function init() {
     db = await openDB();
     updateTodayDate();
     loadBackground();
+    loadTheme();
 
-    // 加载已保存的 Gemini Key
+    // 加载已保存的 API Key
     const savedKey = getGeminiKey();
     if (savedKey) {
         const input = document.getElementById('geminiKeyInput');
@@ -1280,6 +1590,11 @@ async function init() {
 
     // 默认显示课表
     switchModule('schedule');
+
+    // 转盘输入框监听
+    document.querySelectorAll('.wheel-input').forEach(input => {
+        input.addEventListener('input', () => drawWheel());
+    });
 
     // 注册 Service Worker
     if ('serviceWorker' in navigator) {
