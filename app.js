@@ -87,6 +87,29 @@ function getById(table, id) {
     });
 }
 
+// 保存原始数据库操作，用于云端同步包装
+const _dbAdd = add;
+const _dbPut = put;
+const _dbRemove = remove;
+
+async function add(table, data, skipSync = false) {
+    const id = await _dbAdd(table, data);
+    if (!skipSync) await pushToCloud(table, id, { ...data, id }, false);
+    return id;
+}
+
+async function put(table, data, skipSync = false) {
+    const id = await _dbPut(table, data);
+    if (!skipSync) await pushToCloud(table, data.id, data, false);
+    return id;
+}
+
+async function remove(table, id, skipSync = false) {
+    await _dbRemove(table, id);
+    if (!skipSync) await pushToCloud(table, id, {}, true);
+    return id;
+}
+
 // ==================== 工具函数 ====================
 const DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const MOOD_EMOJI = { happy: '😊', calm: '😌', tired: '😴', excited: '🤩', sad: '😢', angry: '😠' };
@@ -486,6 +509,146 @@ async function deleteDiary(id) {
     renderDiary();
 }
 
+// ==================== 云端同步 ====================
+const SUPABASE_URL = 'https://irovkiusdexjstsnzljv.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlyb3ZraXVzZGV4anN0c256bGp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1MDg3MTYsImV4cCI6MjEwMjA4NDcxNn0.xUV5tdrSv_1s24mYcGnXxPyzkJ74gX7iWfXpmjnqlxg';
+
+let deviceId = localStorage.getItem('lt_device_id');
+if (!deviceId) {
+    deviceId = 'dev_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+    localStorage.setItem('lt_device_id', deviceId);
+}
+
+let supabaseClient = null;
+
+async function initSync() {
+    if (!window.supabase) {
+        console.warn('Supabase SDK not loaded');
+        return;
+    }
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // 启动时拉取云端最新数据
+    await pullFromCloud();
+
+    // 订阅实时变更
+    supabaseClient
+        .channel('sync_changes')
+        .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'sync_data'
+        }, payload => {
+            handleRemoteChange(payload.new);
+        })
+        .subscribe();
+}
+
+async function pushToCloud(tableName, recordId, payload, deleted = false) {
+    if (!supabaseClient) return;
+    try {
+        const { error } = await supabaseClient
+            .from('sync_data')
+            .upsert({
+                device_id: deviceId,
+                table_name: tableName,
+                record_id: recordId,
+                payload: payload || {},
+                updated_at: new Date().toISOString(),
+                deleted: deleted
+            }, { onConflict: 'device_id,table_name,record_id' });
+        if (error) console.error('Push error:', error);
+    } catch (e) {
+        console.error('Push exception:', e);
+    }
+}
+
+async function pullFromCloud() {
+    if (!supabaseClient) return;
+    try {
+        const { data, error } = await supabaseClient
+            .from('sync_data')
+            .select('*')
+            .order('updated_at', { ascending: true });
+
+        if (error) {
+            console.error('Pull error:', error);
+            return;
+        }
+
+        // 按 table_name + record_id 去重，取最新
+        const latestMap = new Map();
+        for (const row of (data || [])) {
+            const key = `${row.table_name}:${row.record_id}`;
+            if (!latestMap.has(key) || new Date(row.updated_at) > new Date(latestMap.get(key).updated_at)) {
+                latestMap.set(key, row);
+            }
+        }
+
+        for (const row of latestMap.values()) {
+            if (row.device_id === deviceId) continue; // 自己设备的数据本地已有
+
+            if (row.deleted) {
+                await remove(row.table_name, row.record_id, true);
+            } else {
+                const existing = await getById(row.table_name, row.record_id);
+                const remoteTime = new Date(row.updated_at).getTime();
+                const localTime = existing ? new Date(existing.updatedAt || existing.createdAt || 0).getTime() : 0;
+
+                if (!existing || remoteTime >= localTime) {
+                    await put(row.table_name, { ...row.payload, id: row.record_id }, true);
+                }
+            }
+        }
+
+        // 刷新当前显示的模块
+        const active = document.querySelector('.module.active');
+        if (active) {
+            if (active.id === 'scheduleModule') await renderSchedule();
+            if (active.id === 'financeModule') await renderFinance();
+            if (active.id === 'diaryModule') await renderDiary();
+        }
+    } catch (e) {
+        console.error('Pull exception:', e);
+    }
+}
+
+async function handleRemoteChange(row) {
+    if (!row || row.device_id === deviceId) return;
+
+    // 重新查询该 key 的最新记录（避免收到旧事件的覆盖）
+    const { data } = await supabaseClient
+        .from('sync_data')
+        .select('*')
+        .eq('table_name', row.table_name)
+        .eq('record_id', row.record_id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single();
+
+    const latest = data || row;
+
+    if (latest.deleted) {
+        await remove(latest.table_name, latest.record_id, true);
+    } else {
+        const existing = await getById(latest.table_name, latest.record_id);
+        const remoteTime = new Date(latest.updated_at).getTime();
+        const localTime = existing ? new Date(existing.updatedAt || existing.createdAt || 0).getTime() : 0;
+
+        if (!existing || remoteTime >= localTime) {
+            await put(latest.table_name, { ...latest.payload, id: latest.record_id }, true);
+        }
+    }
+
+    // 刷新当前显示的模块
+    const active = document.querySelector('.module.active');
+    if (active) {
+        if (active.id === 'scheduleModule') await renderSchedule();
+        if (active.id === 'financeModule') await renderFinance();
+        if (active.id === 'diaryModule') await renderDiary();
+    }
+}
+
 // ==================== 辅助函数 ====================
 function escapeHtml(str) {
     if (!str) return '';
@@ -510,6 +673,9 @@ async function init() {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js').catch(() => {});
     }
+
+    // 初始化云端同步
+    await initSync();
 }
 
 init();
