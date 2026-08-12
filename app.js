@@ -542,17 +542,29 @@ async function initSync() {
 async function pushToCloud(tableName, recordId, payload, deleted = false) {
     if (!supabaseClient) return;
     try {
-        const { error } = await supabaseClient
+        const row = {
+            device_id: deviceId,
+            table_name: tableName,
+            record_id: recordId,
+            payload: payload || {},
+            updated_at: new Date().toISOString(),
+            deleted: deleted
+        };
+
+        // 先查询是否已有记录
+        const { data: existing } = await supabaseClient
             .from('sync_data')
-            .upsert({
-                device_id: deviceId,
-                table_name: tableName,
-                record_id: recordId,
-                payload: payload || {},
-                updated_at: new Date().toISOString(),
-                deleted: deleted
-            }, { onConflict: 'device_id,table_name,record_id' });
-        if (error) console.error('Push error:', error);
+            .select('id')
+            .eq('device_id', deviceId)
+            .eq('table_name', tableName)
+            .eq('record_id', recordId)
+            .maybeSingle();
+
+        if (existing) {
+            await supabaseClient.from('sync_data').update(row).eq('id', existing.id);
+        } else {
+            await supabaseClient.from('sync_data').insert(row);
+        }
     } catch (e) {
         console.error('Push exception:', e);
     }
