@@ -912,7 +912,8 @@ async function clearAllData() {
 }
 
 // ==================== AI 助手（Gemini）====================
-const GEMINI_MODEL = 'gemini-pro';
+const AI_MODEL = 'glm-4-flash';
+const AI_BASE_URL = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
 
 function saveGeminiKey() {
     const key = document.getElementById('geminiKeyInput').value.trim();
@@ -927,32 +928,38 @@ function getGeminiKey() {
     return localStorage.getItem('gemini_key') || '';
 }
 
-async function callGemini(prompt) {
+async function callAI(messages) {
     const key = getGeminiKey();
-    if (!key) return '请先设置 Gemini API Key（点击右上角 ⚙️）';
+    if (!key) return '请先设置 API Key（点击右上角 ⚙️）';
 
     try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`, {
+        const res = await fetch(AI_BASE_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.7, maxOutputTokens: 256 }
+                model: AI_MODEL,
+                messages: messages,
+                temperature: 0.7,
+                max_tokens: 256
             })
         });
         const data = await res.json();
         if (data.error) return `AI 出错：${data.error.message}`;
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || 'AI 没有回答';
+        return data.choices?.[0]?.message?.content || 'AI 没有回答';
     } catch (e) {
         return 'AI 请求失败，请检查网络或 API Key';
     }
 }
 
 async function getDiaryFeedback(content) {
-    const prompt = `你是一个温暖、理解力强的心理陪伴助手。用户写了一篇日记，请用中文给一句简短（30-50字）、温暖、走心的反馈，像朋友一样说话。不要分析，不要建议，只是理解和陪伴。
-
-日记内容：${content}`;
-    return await callGemini(prompt);
+    const messages = [
+        { role: 'system', content: '你是一个温暖、理解力强的心理陪伴助手。用户写了一篇日记，请用中文给一句简短（30-50字）、温暖、走心的反馈，像朋友一样说话。不要分析，不要建议，只是理解和陪伴。' },
+        { role: 'user', content: `日记内容：${content}` }
+    ];
+    return await callAI(messages);
 }
 
 async function loadDiaryFeedback(id) {
@@ -1007,13 +1014,12 @@ async function sendAIQuestion() {
     chat.appendChild(loadingBubble);
     chat.scrollTop = chat.scrollHeight;
 
-    const prompt = `你是一个生活数据助手，名字叫"小管家"。基于用户的真实数据回答问题，语气亲切像朋友。如果数据不足就诚实说。
+    const messages = [
+        { role: 'system', content: '你是一个生活数据助手，名字叫"小管家"。基于用户的真实数据回答问题，语气亲切像朋友。如果数据不足就诚实说。' },
+        { role: 'user', content: `用户最近7天数据（JSON格式）：${JSON.stringify(recentData, null, 2)}\n\n用户问题：${question}` }
+    ];
 
-用户最近7天数据（JSON格式）：${JSON.stringify(recentData, null, 2)}
-
-用户问题：${question}`;
-
-    const answer = await callGemini(prompt);
+    const answer = await callAI(messages);
     loadingBubble.innerHTML = escapeHtml(answer).replace(/\n/g, '<br>');
     chat.scrollTop = chat.scrollHeight;
 }
