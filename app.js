@@ -330,9 +330,9 @@ async function renderFinance() {
         }
     });
 
-    document.getElementById('monthIncome').textContent = formatMoney(income);
-    document.getElementById('monthExpense').textContent = formatMoney(expense);
-    document.getElementById('monthBalance').textContent = formatMoney(income - expense);
+    animateMoney(document.getElementById('monthIncome'), income);
+    animateMoney(document.getElementById('monthExpense'), expense);
+    animateMoney(document.getElementById('monthBalance'), income - expense);
 
     // 计算累计余额（按日期从早到晚）
     const sortedAsc = [...list].sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -345,7 +345,7 @@ async function renderFinance() {
         balanceMap.set(t.id, runningBalance);
     });
 
-    document.getElementById('totalBalance').textContent = formatMoney(runningBalance);
+    animateMoney(document.getElementById('totalBalance'), runningBalance);
 
     // 按日期倒序显示
     list.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -683,10 +683,68 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+// ==================== 背景管理 ====================
+function loadBackground() {
+    const bgLayer = document.getElementById('bgLayer');
+    const saved = localStorage.getItem('lt_bg_image');
+    if (saved && bgLayer) {
+        bgLayer.style.backgroundImage = `url(${saved})`;
+        bgLayer.classList.add('has-image');
+    }
+}
+
+function changeBackground(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        localStorage.setItem('lt_bg_image', dataUrl);
+        loadBackground();
+    };
+    reader.readAsDataURL(file);
+}
+
+function resetBackground() {
+    localStorage.removeItem('lt_bg_image');
+    const bgLayer = document.getElementById('bgLayer');
+    if (bgLayer) {
+        bgLayer.style.backgroundImage = '';
+        bgLayer.classList.remove('has-image');
+    }
+    const input = document.getElementById('bgImageInput');
+    if (input) input.value = '';
+}
+
+// ==================== 数字滚动动画 ====================
+function animateMoney(element, endValue, duration = 600) {
+    const startText = element.textContent.replace(/[¥,]/g, '');
+    const startValue = parseFloat(startText) || 0;
+    if (startValue === endValue) return;
+    element.classList.add('updating');
+    const range = endValue - startValue;
+    const startTime = performance.now();
+
+    function step(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const ease = 1 - Math.pow(1 - progress, 3);
+        const current = startValue + range * ease;
+        element.textContent = formatMoney(current);
+        if (progress < 1) {
+            requestAnimationFrame(step);
+        } else {
+            element.classList.remove('updating');
+        }
+    }
+    requestAnimationFrame(step);
+}
+
 // ==================== 初始化 ====================
 async function init() {
     db = await openDB();
     updateTodayDate();
+    loadBackground();
 
     // 设置默认日期为今天
     document.getElementById('financeDate').value = todayStr();

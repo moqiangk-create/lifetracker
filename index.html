@@ -36,11 +36,15 @@
     </script>
 </head>
 <body>
+    <div class="bg-layer" id="bgLayer"></div>
     <div id="app">
         <!-- 顶部标题 -->
         <header class="app-header">
             <h1>LifeTracker</h1>
-            <button class="btn-install" id="installBtn" onclick="installApp()" style="display:none">📲 安装</button>
+            <div class="header-actions">
+                <button class="btn-settings" onclick="openModal('settingsModal')" title="设置">⚙️</button>
+                <button class="btn-install" id="installBtn" onclick="installApp()" style="display:none">📲 安装</button>
+            </div>
             <span class="date-today" id="dateToday"></span>
         </header>
 
@@ -285,6 +289,26 @@
                     <button type="submit" class="btn-primary">保存</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- 设置模态框 -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🎨 界面设置</h3>
+                <button class="btn-close" onclick="closeModal('settingsModal')">&times;</button>
+            </div>
+            <div class="settings-body">
+                <div class="form-group">
+                    <label>背景图片</label>
+                    <input type="file" id="bgImageInput" accept="image/*" onchange="changeBackground(event)">
+                    <small>选择一张照片作为背景，不选则使用默认渐变</small>
+                </div>
+                <div class="form-group">
+                    <button type="button" class="btn-secondary" onclick="resetBackground()">恢复默认背景</button>
+                </div>
+            </div>
         </div>
     </div>
 
