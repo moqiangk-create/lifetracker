@@ -912,7 +912,7 @@ async function clearAllData() {
 }
 
 // ==================== AI 助手（Gemini）====================
-const GEMINI_MODEL = 'gemini-1.5-flash-latest';
+const GEMINI_MODEL = 'gemini-pro';
 
 function saveGeminiKey() {
     const key = document.getElementById('geminiKeyInput').value.trim();
@@ -932,7 +932,7 @@ async function callGemini(prompt) {
     if (!key) return '请先设置 Gemini API Key（点击右上角 ⚙️）';
 
     try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent?key=${key}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
