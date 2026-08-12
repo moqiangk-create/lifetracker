@@ -5,12 +5,15 @@
 
 // ==================== 数据库封装 ====================
 const DB_NAME = 'LifeTrackerDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const TABLES = {
     COURSES: 'courses',
     TRANSACTIONS: 'transactions',
-    DIARIES: 'diaries'
+    DIARIES: 'diaries',
+    HABITS: 'habits',
+    HABIT_LOGS: 'habitLogs',
+    SLEEP: 'sleep'
 };
 
 let db = null;
@@ -32,6 +35,19 @@ function openDB() {
             if (!database.objectStoreNames.contains(TABLES.DIARIES)) {
                 const ds = database.createObjectStore(TABLES.DIARIES, { keyPath: 'id', autoIncrement: true });
                 ds.createIndex('date', 'date', { unique: false });
+            }
+            // v2 新增表
+            if (!database.objectStoreNames.contains(TABLES.HABITS)) {
+                database.createObjectStore(TABLES.HABITS, { keyPath: 'id', autoIncrement: true });
+            }
+            if (!database.objectStoreNames.contains(TABLES.HABIT_LOGS)) {
+                const hl = database.createObjectStore(TABLES.HABIT_LOGS, { keyPath: 'id', autoIncrement: true });
+                hl.createIndex('habitId', 'habitId', { unique: false });
+                hl.createIndex('date', 'date', { unique: false });
+            }
+            if (!database.objectStoreNames.contains(TABLES.SLEEP)) {
+                const sl = database.createObjectStore(TABLES.SLEEP, { keyPath: 'id', autoIncrement: true });
+                sl.createIndex('date', 'date', { unique: false });
             }
         };
     });
@@ -194,7 +210,7 @@ function switchModule(name) {
     document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
-    const map = { schedule: 'scheduleModule', finance: 'financeModule', diary: 'diaryModule' };
+    const map = { schedule: 'scheduleModule', finance: 'financeModule', diary: 'diaryModule', habit: 'habitModule', sleep: 'sleepModule' };
     document.getElementById(map[name]).classList.add('active');
     document.querySelector(`.nav-item[data-module="${name}"]`).classList.add('active');
 
@@ -202,6 +218,8 @@ function switchModule(name) {
     if (name === 'schedule') renderSchedule();
     if (name === 'finance') renderFinance();
     if (name === 'diary') renderDiary();
+    if (name === 'habit') renderHabits();
+    if (name === 'sleep') renderSleep();
 }
 
 function openModal(id) {
@@ -585,6 +603,311 @@ async function deleteDiary(id) {
     renderDiary();
 }
 
+// ==================== 习惯打卡模块 ====================
+function getWeekDays() {
+    const days = [];
+    const today = new Date();
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        days.push(d.toISOString().split('T')[0]);
+    }
+    return days;
+}
+
+function calculateStreak(habitId, logs) {
+    const habitLogs = logs.filter(l => l.habitId === habitId).map(l => l.date).sort().reverse();
+    if (habitLogs.length === 0) return 0;
+    let streak = 0;
+    const today = new Date(todayStr());
+    let checkDate = new Date(today);
+    if (!habitLogs.includes(todayStr())) {
+        checkDate.setDate(checkDate.getDate() - 1);
+    }
+    while (true) {
+        const dateStr = checkDate.toISOString().split('T')[0];
+        if (habitLogs.includes(dateStr)) {
+            streak++;
+            checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+            break;
+        }
+    }
+    return streak;
+}
+
+async function renderHabits() {
+    const habits = await getAll(TABLES.HABITS);
+    const logs = await getAll(TABLES.HABIT_LOGS);
+    const today = todayStr();
+    const weekDays = getWeekDays();
+    const container = document.getElementById('habitList');
+    const summary = document.getElementById('habitSummary');
+
+    const todayLogs = new Set(logs.filter(l => l.date === today).map(l => l.habitId));
+    const completedToday = habits.filter(h => todayLogs.has(h.id)).length;
+
+    summary.innerHTML = `
+        <div class="summary-card">
+            <span class="label">今日打卡</span>
+            <span class="amount">${completedToday}/${habits.length}</span>
+        </div>
+    `;
+
+    if (habits.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <span class="emoji">✅</span>
+                <div>还没有习惯，点击右上角添加吧</div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = habits.map((h, idx) => {
+        const isDone = todayLogs.has(h.id);
+        const streak = calculateStreak(h.id, logs);
+        const weekStatus = weekDays.map(d => {
+            const done = logs.some(l => l.habitId === h.id && l.date === d);
+            return `<div class="habit-dot ${done ? 'done' : ''}"></div>`;
+        }).join('');
+        const colorMap = {
+            indigo: '#4f46e5', rose: '#e11d48', emerald: '#059669',
+            amber: '#d97706', sky: '#0284c7', violet: '#7c3aed'
+        };
+        const color = colorMap[h.color] || colorMap.indigo;
+
+        return `
+            <div class="habit-card ${isDone ? 'completed' : ''}" style="--habit-color:${color}">
+                <div class="habit-main" onclick="toggleHabit(${h.id})">
+                    <span class="habit-icon">${h.icon || '✨'}</span>
+                    <div class="habit-info">
+                        <div class="habit-name">${escapeHtml(h.name)}</div>
+                        <div class="habit-streak">${streak > 0 ? '🔥 连续 ' + streak + ' 天' : '还没开始'}</div>
+                    </div>
+                    <div class="habit-check">${isDone ? '✓' : ''}</div>
+                </div>
+                <div class="habit-week">${weekStatus}</div>
+                <div class="habit-actions">
+                    <button class="btn-icon" onclick="event.stopPropagation(); editHabit(${h.id})">✏️</button>
+                    <button class="btn-icon" onclick="event.stopPropagation(); deleteHabit(${h.id})">🗑️</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function toggleHabit(habitId) {
+    const today = todayStr();
+    const logs = await getAll(TABLES.HABIT_LOGS);
+    const existing = logs.find(l => l.habitId === habitId && l.date === today);
+    if (existing) {
+        await remove(TABLES.HABIT_LOGS, existing.id);
+    } else {
+        await add(TABLES.HABIT_LOGS, { habitId, date: today });
+    }
+    renderHabits();
+}
+
+async function saveHabit(e) {
+    e.preventDefault();
+    const id = document.getElementById('habitId').value;
+    const data = {
+        name: document.getElementById('habitName').value.trim(),
+        icon: document.getElementById('habitIcon').value,
+        color: document.getElementById('habitColor').value
+    };
+    if (id) {
+        data.id = parseInt(id);
+        await put(TABLES.HABITS, data);
+    } else {
+        await add(TABLES.HABITS, data);
+    }
+    closeModal('habitModal');
+    renderHabits();
+}
+
+async function editHabit(id) {
+    const h = await getById(TABLES.HABITS, id);
+    if (!h) return;
+    document.getElementById('habitId').value = h.id;
+    document.getElementById('habitName').value = h.name;
+    document.getElementById('habitIcon').value = h.icon || '✨';
+    document.getElementById('habitColor').value = h.color || 'indigo';
+    openModal('habitModal');
+}
+
+async function deleteHabit(id) {
+    if (!confirm('确定删除这个习惯吗？相关打卡记录也会一起删除。')) return;
+    await remove(TABLES.HABITS, id);
+    const logs = await getAll(TABLES.HABIT_LOGS);
+    for (const log of logs.filter(l => l.habitId === id)) {
+        await dbRemove(TABLES.HABIT_LOGS, log.id);
+    }
+    renderHabits();
+}
+
+// ==================== 睡眠记录模块 ====================
+function calculateSleepHours(bed, wake) {
+    const [bh, bm] = bed.split(':').map(Number);
+    const [wh, wm] = wake.split(':').map(Number);
+    let start = bh * 60 + bm;
+    let end = wh * 60 + wm;
+    if (end < start) end += 24 * 60;
+    return (end - start) / 60;
+}
+
+function formatSleepDuration(hours) {
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    return `${h}小时${m > 0 ? m + '分' : ''}`;
+}
+
+async function renderSleep() {
+    const list = await getAll(TABLES.SLEEP);
+    list.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const summary = document.getElementById('sleepSummary');
+    const container = document.getElementById('sleepList');
+
+    const avgHours = list.length
+        ? (list.reduce((sum, s) => sum + calculateSleepHours(s.bedTime, s.wakeTime), 0) / list.length).toFixed(1)
+        : 0;
+    const qualityEmoji = { 5: '😴', 4: '😊', 3: '😐', 2: '😵', 1: '💀' };
+
+    summary.innerHTML = `
+        <div class="summary-card">
+            <span class="label">平均睡眠</span>
+            <span class="amount">${avgHours}h</span>
+        </div>
+        <div class="summary-card">
+            <span class="label">记录天数</span>
+            <span class="amount">${list.length}天</span>
+        </div>
+    `;
+
+    if (list.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <span class="emoji">🌙</span>
+                <div>还没有睡眠记录，点击右上角记录昨晚的睡眠吧</div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = list.map((s, idx) => {
+        const hours = calculateSleepHours(s.bedTime, s.wakeTime);
+        return `
+            <div class="sleep-item" onclick="editSleep(${s.id})">
+                <div class="sleep-left">
+                    <div class="sleep-date">${formatDate(s.date)}</div>
+                    <div class="sleep-time">${s.bedTime} → ${s.wakeTime}</div>
+                    <div class="sleep-note">${escapeHtml(s.note || '')}</div>
+                </div>
+                <div class="sleep-right">
+                    <div class="sleep-duration">${formatSleepDuration(hours)}</div>
+                    <div class="sleep-quality">${qualityEmoji[s.quality] || '😐'} ${s.quality}分</div>
+                </div>
+                <button class="btn-icon" onclick="event.stopPropagation(); deleteSleep(${s.id})">🗑️</button>
+            </div>
+        `;
+    }).join('');
+}
+
+async function saveSleep(e) {
+    e.preventDefault();
+    const id = document.getElementById('sleepId').value;
+    const data = {
+        date: document.getElementById('sleepDate').value,
+        bedTime: document.getElementById('sleepBedTime').value,
+        wakeTime: document.getElementById('sleepWakeTime').value,
+        quality: parseInt(document.getElementById('sleepQuality').value),
+        note: document.getElementById('sleepNote').value.trim()
+    };
+    if (id) {
+        data.id = parseInt(id);
+        await put(TABLES.SLEEP, data);
+    } else {
+        await add(TABLES.SLEEP, data);
+    }
+    closeModal('sleepModal');
+    renderSleep();
+}
+
+async function editSleep(id) {
+    const s = await getById(TABLES.SLEEP, id);
+    if (!s) return;
+    document.getElementById('sleepId').value = s.id;
+    document.getElementById('sleepDate').value = s.date;
+    document.getElementById('sleepBedTime').value = s.bedTime;
+    document.getElementById('sleepWakeTime').value = s.wakeTime;
+    document.getElementById('sleepQuality').value = s.quality;
+    document.getElementById('sleepNote').value = s.note || '';
+    openModal('sleepModal');
+}
+
+async function deleteSleep(id) {
+    if (!confirm('确定删除这条睡眠记录吗？')) return;
+    await remove(TABLES.SLEEP, id);
+    renderSleep();
+}
+
+// ==================== 数据导出导入 ====================
+async function exportData() {
+    const data = {};
+    for (const key of Object.keys(TABLES)) {
+        data[TABLES[key]] = await getAll(TABLES[key]);
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lifetracker-backup-${todayStr()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+async function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (!confirm('导入将覆盖所有现有数据，确定继续？')) return;
+
+        for (const key of Object.keys(TABLES)) {
+            const table = TABLES[key];
+            const items = await getAll(table);
+            for (const item of items) {
+                await dbRemove(table, item.id);
+            }
+            for (const item of (data[table] || [])) {
+                delete item.id;
+                await dbAdd(table, item);
+            }
+        }
+        alert('导入成功！页面即将刷新。');
+        location.reload();
+    } catch (e) {
+        alert('导入失败：' + e.message);
+    }
+    event.target.value = '';
+}
+
+async function clearAllData() {
+    if (!confirm('⚠️ 确定清空所有数据吗？此操作不可恢复！')) return;
+    if (!confirm('再次确认：你真的要删除所有课表、记账、日记、打卡、睡眠记录吗？')) return;
+    for (const key of Object.keys(TABLES)) {
+        const items = await getAll(TABLES[key]);
+        for (const item of items) {
+            await dbRemove(TABLES[key], item.id);
+        }
+    }
+    alert('已清空所有数据。');
+    location.reload();
+}
+
 // ==================== 云端同步 ====================
 const SUPABASE_URL = 'https://irovkiusdexjstsnzljv.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlyb3ZraXVzZGV4anN0c256bGp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1MDg3MTYsImV4cCI6MjEwMjA4NDcxNn0.xUV5tdrSv_1s24mYcGnXxPyzkJ74gX7iWfXpmjnqlxg';
@@ -656,7 +979,7 @@ async function pushToCloud(tableName, recordId, payload, deleted = false) {
 
 async function pushLocalToCloud() {
     if (!supabaseClient) return;
-    const tables = [TABLES.COURSES, TABLES.TRANSACTIONS, TABLES.DIARIES];
+    const tables = [TABLES.COURSES, TABLES.TRANSACTIONS, TABLES.DIARIES, TABLES.HABITS, TABLES.HABIT_LOGS, TABLES.SLEEP];
     for (const table of tables) {
         try {
             const items = await getAll(table);

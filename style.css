@@ -892,6 +892,201 @@ form {
     font-size: 14px;
 }
 
+/* 习惯打卡 */
+.habit-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.habit-card {
+    background: var(--surface);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--habit-color, var(--primary));
+    animation: slideUpFade 0.4s ease backwards;
+    transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
+}
+
+.habit-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.habit-card.completed {
+    opacity: 0.85;
+    border-left-color: var(--success);
+}
+
+.habit-card.completed .habit-check {
+    background: var(--success);
+    color: white;
+}
+
+.habit-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+}
+
+.habit-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(79, 70, 229, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+}
+
+.habit-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.habit-name {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.habit-streak {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.habit-check {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+
+.habit-week {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+    padding-left: 56px;
+}
+
+.habit-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.08);
+    transition: background 0.2s, transform 0.2s;
+}
+
+.habit-dot.done {
+    background: var(--success);
+    transform: scale(1.2);
+}
+
+.habit-actions {
+    position: absolute;
+    top: 12px;
+    right: 48px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.habit-card:hover .habit-actions {
+    opacity: 1;
+}
+
+/* 睡眠记录 */
+.sleep-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.sleep-item {
+    background: var(--surface);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    animation: slideUpFade 0.4s ease backwards;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.sleep-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.sleep-left {
+    flex: 1;
+    min-width: 0;
+}
+
+.sleep-date {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.sleep-time {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+.sleep-note {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sleep-right {
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.sleep-duration {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.sleep-quality {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+/* 设置面板 */
+.settings-body {
+    padding: 16px 20px 24px;
+}
+
 /* 响应式：桌面端 */
 @media (min-width: 768px) {
     .main-content {
