@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LifeTracker - 生活管家</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+    <div id="app">
+        <!-- 顶部标题 -->
+        <header class="app-header">
+            <h1>LifeTracker</h1>
+            <span class="date-today" id="dateToday"></span>
+        </header>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 课表模块 -->
+            <section id="scheduleModule" class="module active">
+                <div class="module-header">
+                    <h2>本周课表</h2>
+                    <button class="btn-primary" onclick="openModal('courseModal')">+ 添加课程</button>
+                </div>
+                <div class="schedule-container">
+                    <div class="schedule-grid" id="scheduleGrid">
+                        <!-- 动态生成 -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- 记账模块 -->
+            <section id="financeModule" class="module">
+                <div class="module-header">
+                    <h2>收支记账</h2>
+                    <button class="btn-primary" onclick="openModal('financeModal')">+ 记一笔</button>
+                </div>
+                <div class="finance-summary">
+                    <div class="summary-card income">
+                        <span class="label">本月收入</span>
+                        <span class="amount" id="monthIncome">¥0.00</span>
+                    </div>
+                    <div class="summary-card expense">
+                        <span class="label">本月支出</span>
+                        <span class="amount" id="monthExpense">¥0.00</span>
+                    </div>
+                    <div class="summary-card balance">
+                        <span class="label">本月结余</span>
+                        <span class="amount" id="monthBalance">¥0.00</span>
+                    </div>
+                    <div class="summary-card total">
+                        <span class="label">当前余额</span>
+                        <span class="amount" id="totalBalance">¥0.00</span>
+                    </div>
+                </div>
+                <div class="finance-list" id="financeList">
+                    <!-- 动态生成 -->
+                </div>
+            </section>
+
+            <!-- 日记模块 -->
+            <section id="diaryModule" class="module">
+                <div class="module-header">
+                    <h2>生活日记</h2>
+                    <button class="btn-primary" onclick="openModal('diaryModal')">+ 写日记</button>
+                </div>
+                <div class="diary-timeline" id="diaryTimeline">
+                    <!-- 动态生成 -->
+                </div>
+            </section>
+        </main>
+
+        <!-- 底部导航 -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-module="schedule" onclick="switchModule('schedule')">
+                <span class="icon">📅</span>
+                <span class="label">课表</span>
+            </button>
+            <button class="nav-item" data-module="finance" onclick="switchModule('finance')">
+                <span class="icon">💰</span>
+                <span class="label">记账</span>
+            </button>
+            <button class="nav-item" data-module="diary" onclick="switchModule('diary')">
+                <span class="icon">📝</span>
+                <span class="label">日记</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- 课程模态框 -->
+    <div class="modal" id="courseModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>添加/编辑课程</h3>
+                <button class="btn-close" onclick="closeModal('courseModal')">&times;</button>
+            </div>
+            <form id="courseForm" onsubmit="saveCourse(event)">
+                <input type="hidden" id="courseId">
+                <div class="form-group">
+                    <label>课程名称</label>
+                    <input type="text" id="courseName" required placeholder="例如：高等数学">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>星期</label>
+                        <select id="courseDay" required>
+                            <option value="0">周一</option>
+                            <option value="1">周二</option>
+                            <option value="2">周三</option>
+                            <option value="3">周四</option>
+                            <option value="4">周五</option>
+                            <option value="5">周六</option>
+                            <option value="6">周日</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>起始节次</label>
+                        <select id="coursePeriod" required>
+                            <option value="1">第1节 (08:00)</option>
+                            <option value="2">第2节 (08:50)</option>
+                            <option value="3">第3节 (09:55)</option>
+                            <option value="4">第4节 (10:45)</option>
+                            <option value="5">第5节 (11:35)</option>
+                            <option value="6">第6节 (13:15)</option>
+                            <option value="7">第7节 (14:05)</option>
+                            <option value="8">第8节 (15:05)</option>
+                            <option value="9">第9节 (15:55)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>持续节数</label>
+                        <select id="courseDuration" required>
+                            <option value="1">1 节</option>
+                            <option value="2">2 节（连上）</option>
+                            <option value="3">3 节（连上）</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>颜色标记</label>
+                        <select id="courseColor">
+                            <option value="indigo">靛蓝</option>
+                            <option value="rose">玫红</option>
+                            <option value="emerald">翠绿</option>
+                            <option value="amber">琥珀</option>
+                            <option value="sky">天蓝</option>
+                            <option value="violet">紫罗兰</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>上课地点</label>
+                    <input type="text" id="courseLocation" placeholder="例如：教学楼 A-301">
+                </div>
+                <div class="form-group">
+                    <label>教师/备注</label>
+                    <input type="text" id="courseTeacher" placeholder="可选">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal('courseModal')">取消</button>
+                    <button type="submit" class="btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 记账模态框 -->
+    <div class="modal" id="financeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>记一笔</h3>
+                <button class="btn-close" onclick="closeModal('financeModal')">&times;</button>
+            </div>
+            <form id="financeForm" onsubmit="saveFinance(event)">
+                <input type="hidden" id="financeId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>类型</label>
+                        <select id="financeType" required>
+                            <option value="expense">支出</option>
+                            <option value="income">收入</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>金额</label>
+                        <input type="number" id="financeAmount" step="0.01" required placeholder="0.00">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>分类</label>
+                    <select id="financeCategory">
+                        <option value="餐饮">餐饮</option>
+                        <option value="交通">交通</option>
+                        <option value="购物">购物</option>
+                        <option value="娱乐">娱乐</option>
+                        <option value="学习">学习</option>
+                        <option value="住宿">住宿</option>
+                        <option value="医疗">医疗</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>日期</label>
+                    <input type="date" id="financeDate" required>
+                </div>
+                <div class="form-group">
+                    <label>备注</label>
+                    <input type="text" id="financeNote" placeholder="可选">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal('financeModal')">取消</button>
+                    <button type="submit" class="btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 日记模态框 -->
+    <div class="modal" id="diaryModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>写日记</h3>
+                <button class="btn-close" onclick="closeModal('diaryModal')">&times;</button>
+            </div>
+            <form id="diaryForm" onsubmit="saveDiary(event)">
+                <input type="hidden" id="diaryId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>日期</label>
+                        <input type="date" id="diaryDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label>心情</label>
+                        <select id="diaryMood">
+                            <option value="happy">😊 开心</option>
+                            <option value="calm">😌 平静</option>
+                            <option value="tired">😴 疲惫</option>
+                            <option value="excited">🤩 兴奋</option>
+                            <option value="sad">😢 难过</option>
+                            <option value="angry">😠 生气</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>今日记录</label>
+                    <textarea id="diaryContent" rows="6" required placeholder="今天发生了什么有趣的事..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>标签（用空格分隔）</label>
+                    <input type="text" id="diaryTags" placeholder="例如：学习 运动 美食">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal('diaryModal')">取消</button>
+                    <button type="submit" class="btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
