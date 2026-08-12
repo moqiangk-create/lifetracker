@@ -135,6 +135,60 @@ function formatMoney(n) {
     return '¥' + Number(n).toFixed(2);
 }
 
+// ==================== 照片工具 ====================
+function compressImage(file, maxWidth = 800, quality = 0.7) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let w = img.width, h = img.height;
+            if (w > maxWidth) {
+                h = Math.round(h * (maxWidth / w));
+                w = maxWidth;
+            }
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            resolve(dataUrl);
+            URL.revokeObjectURL(img.src);
+        };
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+    });
+}
+
+async function previewDiaryPhotos(event) {
+    const files = event.target.files;
+    const preview = document.getElementById('photoPreview');
+    const existingCount = preview.querySelectorAll('img').length;
+    const maxPhotos = 3;
+
+    for (let i = 0; i < files.length && existingCount + i < maxPhotos; i++) {
+        const file = files[i];
+        if (!file.type.startsWith('image/')) continue;
+        try {
+            const compressed = await compressImage(file, 800, 0.7);
+            const div = document.createElement('div');
+            div.className = 'photo-item';
+            div.innerHTML = `<img src="${compressed}"><button type="button" class="remove-photo" onclick="this.parentElement.remove()">×</button>`;
+            preview.appendChild(div);
+        } catch (e) {
+            console.error('Compress error:', e);
+        }
+    }
+    event.target.value = '';
+}
+
+function viewPhoto(src) {
+    const overlay = document.createElement('div');
+    overlay.className = 'photo-viewer';
+    overlay.innerHTML = `<img src="${src}" alt="照片">`;
+    overlay.onclick = () => overlay.remove();
+    document.body.appendChild(overlay);
+}
+
 // ==================== 通用 UI ====================
 function switchModule(name) {
     document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
@@ -164,6 +218,9 @@ function closeModal(id) {
         form.reset();
         form.querySelectorAll('input[type="hidden"]').forEach(h => h.value = '');
     }
+    // 清空照片预览
+    const photoPreview = document.getElementById('photoPreview');
+    if (photoPreview) photoPreview.innerHTML = '';
 }
 
 // 点击模态框背景关闭
@@ -440,6 +497,7 @@ async function renderDiary() {
 
     container.innerHTML = list.map(d => {
         const tags = Array.isArray(d.tags) ? d.tags : (d.tags || '').split(/\s+/).filter(Boolean);
+        const photos = d.photos || [];
         return `
             <div class="diary-card mood-${d.mood}" onclick="editDiary(${d.id})">
                 <div class="diary-header">
@@ -447,6 +505,11 @@ async function renderDiary() {
                     <span class="diary-mood">${MOOD_EMOJI[d.mood] || ''}</span>
                 </div>
                 <div class="diary-content">${escapeHtml(d.content)}</div>
+                ${photos.length ? `
+                    <div class="diary-photos">
+                        ${photos.map(src => `<img src="${src}" onclick="event.stopPropagation(); viewPhoto('${src}')">`).join('')}
+                    </div>
+                ` : ''}
                 ${tags.length ? `
                     <div class="diary-tags">
                         ${tags.map(t => `<span class="diary-tag">${escapeHtml(t)}</span>`).join('')}
@@ -464,11 +527,17 @@ async function saveDiary(e) {
     e.preventDefault();
     const id = document.getElementById('diaryId').value;
     const tagsStr = document.getElementById('diaryTags').value.trim();
+
+    // 收集照片
+    const photoImgs = document.querySelectorAll('#photoPreview img');
+    const photos = Array.from(photoImgs).map(img => img.src);
+
     const data = {
         date: document.getElementById('diaryDate').value,
         content: document.getElementById('diaryContent').value.trim(),
         mood: document.getElementById('diaryMood').value,
         tags: tagsStr ? tagsStr.split(/\s+/).filter(Boolean) : [],
+        photos: photos,
         createdAt: new Date().toISOString()
     };
 
@@ -494,6 +563,18 @@ async function editDiary(id) {
     document.getElementById('diaryContent').value = d.content;
     document.getElementById('diaryMood').value = d.mood;
     document.getElementById('diaryTags').value = Array.isArray(d.tags) ? d.tags.join(' ') : (d.tags || '');
+
+    // 回显照片
+    const preview = document.getElementById('photoPreview');
+    preview.innerHTML = '';
+    if (d.photos && d.photos.length) {
+        d.photos.forEach(src => {
+            const div = document.createElement('div');
+            div.className = 'photo-item';
+            div.innerHTML = `<img src="${src}"><button type="button" class="remove-photo" onclick="this.parentElement.remove()">×</button>`;
+            preview.appendChild(div);
+        });
+    }
 
     openModal('diaryModal');
 }

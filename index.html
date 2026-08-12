@@ -281,6 +281,11 @@
                     <textarea id="diaryContent" rows="6" required placeholder="今天发生了什么有趣的事..."></textarea>
                 </div>
                 <div class="form-group">
+                    <label>照片（最多3张）</label>
+                    <input type="file" id="diaryPhotos" accept="image/*" multiple onchange="previewDiaryPhotos(event)">
+                    <div class="photo-preview" id="photoPreview"></div>
+                </div>
+                <div class="form-group">
                     <label>标签（用空格分隔）</label>
                     <input type="text" id="diaryTags" placeholder="例如：学习 运动 美食">
                 </div>
